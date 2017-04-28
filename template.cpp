@@ -1,9 +1,9 @@
 //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 /*
-*	Author:	Camilo Talero
+*	Author:	Camilo Talero, Scott Saunders
 *
+* Class:  Cpsc565
 *
-*	Version:	Template
 *
 *	References:
 *	https://open.gl
@@ -12,6 +12,10 @@
 *
 *	Note: Based on the Boiler Plate written by Dr. Sonny Chan, University of Calgary,
 *		Alberta Canada.
+*
+*
+* Dev-notes: X,Y,Z -> left/right,back/forward,up/down in the default camera frame.
+*
 */
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -89,6 +93,13 @@ struct Geometry
 
 Camera cam;
 
+//Flock *flock;		//Switching away for multi-flock!
+
+#define flockWrapperSet(X,Y) if(selectedFlock != NULL){selectedFlock->X = Y;} else { for(Flock * f: flocks) {f->X = Y;} }
+
+vector<Flock *> flocks;
+Flock * selectedFlock;
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 //========================================================================================
@@ -114,6 +125,9 @@ void createGeometry(Geometry &g, vector<vec3> vertices, vector<uint> indices);
 void createGeometry(Geometry &g);
 void deleteGeometry(Geometry &g);
 
+void initFlocks(int numFlocks);
+void initFlocks();
+
 GLFWwindow* createWindow();
 
 string loadSourceFile(string &filepath);
@@ -131,13 +145,10 @@ double calculateFPS(double prevTime, double currentTime);
 
 //--------------------------------------------------------------------------------------\\
 //**************************************************************************************\\
-
-	/*	MAIN FUNCTION 	*/
-
+git@github.com:ttoocs/emergent2.git
 //**************************************************************************************\\
 //--------------------------------------------------------------------------------------\\
 
-Flock *flock;
 int main(int argc, char **argv)
 {
 	/*FT_Library ft;
@@ -172,7 +183,7 @@ int main(int argc, char **argv)
 	//An error will always be thrown when initializing glew.
 	//It can be safely discarded so we call glGetError() to delete it and move on.
 
-//Example code, delete or modify
+//Initalize openGL structs.
 //**********************************************************************************
 	vector<GLuint> programs;
 	vector<Shader> shaders;
@@ -184,24 +195,11 @@ int main(int argc, char **argv)
 	createGeometry(shapes[0]);
 	createGeometry(shapes[1]);
 	createGeometry(shapes[2]);
-//**********************************************************************************
-	loadObjFile("Models/PyramidBoid.obj", shapes[0].vertices, shapes[0].normals, shapes[0].uvs, shapes[0].indices);
-	flock = new Flock("FlockInfo.txt");
-	loadGeometryArrays(programs[0], shapes[0]);
-	loadColor(vec4(1,0.3,0,1), programs[0]);
-	setDrawingMode(1,programs[0]);
 
-	float side = 10000;
-	shapes[1].vertices = {vec3(side, side, -flock->radius), vec3(side, -side, -flock->radius),
-		vec3(-side, -side, -flock->radius), vec3(-side, side, -flock->radius)};
-	shapes[1].normals = {vec3(0,0,1), vec3(0,0,1), vec3(0,0,1), vec3(0,0,1)};
-
-	shapes[1].indices = {0,1,2,3,0};
-	loadGeometryArrays(programs[0], shapes[1]);
+  //Other openGL stuff.
 
 	int width, height;
 	glfwGetWindowSize(window, &width, &height);
-	cam = *(new Camera(mat3(1), vec3(0,-200,0), width, height));
 
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LEQUAL);
@@ -210,15 +208,53 @@ int main(int argc, char **argv)
 
 	errno = 0;
 	setpriority(PRIO_PROCESS, 0, -20);
+//**********************************************************************************
 
+  //priority out
   cout << "Running with priority: " << getpriority(PRIO_PROCESS, 0) << endl;
   cout <<"User: " << getuid() << endl;
 
-	Sphere *s = new Sphere(vec3(50,0,0), 10);
-	s->getGeometry(shapes[2].vertices, shapes[2].normals, shapes[2].indices);
-	loadGeometryArrays(programs[0], shapes[2]);
+  //The flocks:
 
-	Flock::objects.push_back(s);
+	loadObjFile("Models/PyramidBoid.obj", shapes[0].vertices, shapes[0].normals, shapes[0].uvs, shapes[0].indices);
+	initFlocks(5);	//Make n flocks.
+	selectedFlock = flocks[0];
+
+	loadGeometryArrays(programs[0], shapes[0]);
+	loadColor(vec4(1,0.3,0,1), programs[0]);
+	setDrawingMode(1,programs[0]);
+
+  //The "ground"
+	float side = 10000;
+	float down = -1000;
+	shapes[1].vertices = {vec3(side, side, down), vec3(side, -side, down),
+		vec3(-side, -side, down), vec3(-side, side, down)};
+	shapes[1].normals = {vec3(0,0,1), vec3(0,0,1), vec3(0,0,1), vec3(0,0,1)};
+
+	shapes[1].indices = {0,1,2,3,0};
+	loadGeometryArrays(programs[0], shapes[1]);
+
+	cam = *(new Camera(mat3(1), vec3(0,-200,0), width, height));
+
+  //The center sphere. (well, actually slightly off center..)
+
+	vector<Sphere*> Spheres;
+	#define ArangeSX 250
+	#define ArangeSY 250
+	#define ArangeSZ 250
+	#define ArangeSRmn 1
+	#define ArangeSRmx 20
+	for(int i=0; i < 7 ; i++){
+
+		Sphere *s = new Sphere(vec3((float) ((rand() % ArangeSX*2 )- ArangeSX),
+			(float) ((rand() % ArangeSY*2 )- ArangeSY),
+			(float) ((rand() % ArangeSZ*2 )- ArangeSZ)),
+			(float) ((rand() % ArangeSRmx) + (ArangeSRmn)) );
+
+			//Sphere *s = new Sphere(vec3(0,0,0),5);
+		Spheres.push_back(s);
+		Flock::objects.push_back(s);
+	}
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -229,26 +265,37 @@ int main(int argc, char **argv)
 		t = glfwGetTime();
 		// cout << calculateFPS(temp, t) << endl;*/
 		//t+=0.005;
-		glClearColor(0.f, 0.8f, 1.f, 1.0f);
+		glClearColor(0.f, 0.8f, 1.f, 1.0f); //blue-ish sky.
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		flock->update(t);
 		setDrawingMode(1,programs[0]);
 		glUseProgram(programs[0]);
-		for(Boid *b: flock->boids)
-		{
-			loadColor(vec4(1,0.3,0,1), programs[0]);
-			loadModelMatrix(b->getModelMatrix(), programs[0]);
-			render(shapes[0], GL_TRIANGLE_STRIP);
-			//render(shapes[1], GL_POINTS);
+		for(Flock * f : flocks){
+			f->update(t);
+			loadColor(vec4(f->color,1), programs[0]); //This should be a property of the flock itself
+			for(Boid *b: f->boids)
+			{
+				loadModelMatrix(b->getModelMatrix(), programs[0]);
+				render(shapes[0], GL_TRIANGLE_STRIP);
+				//render(shapes[1], GL_POINTS);
+			}
 		}
 
 		//setDrawingMode(0,programs[0]);
+		//Draw ground:
 		loadColor(vec4(0,0.3,0,1), programs[0]);
 		loadModelMatrix(mat4(1), programs[0]);
 		render(shapes[1], GL_TRIANGLE_STRIP);
+
+
+		//Draw spheres
 		loadColor(vec4(0,0,1,1), programs[0]);
-		render(shapes[2], GL_POINTS);
+
+		for(Sphere * s: Spheres){
+			s->getGeometry(shapes[2].vertices, shapes[2].normals, shapes[2].indices);
+			loadGeometryArrays(programs[0], shapes[2]);
+			render(shapes[2], GL_TRIANGLE_STRIP);
+		}
 
 
 		//cam.setPosition(flock->boids[0]->position + vec3(0,-200,0));
@@ -272,12 +319,40 @@ int main(int argc, char **argv)
 }
 //**************************************************************************************\\
 
+void initFlocks(int numFlocks){
+    while(flocks.size() > 0){
+        int i = flocks.size()-1;
+        Flock * f = flocks[i];
+        f->boids.clear();
+        delete(f);
+        flocks.pop_back();
+        glfwSetTime(0);
+    }
+
+    for(int i =0; i < numFlocks; i++){
+				string filename;
+				filename = "FlockInfo" + to_string(i) + ".txt";
+				//filename = "FlockInfo.txt"
+        Flock * flock = new Flock(filename);
+        flocks.push_back(flock);
+    }
+
+    selectedFlock = NULL;
+}
+
+void initFlocks(){
+    int numFlocks = flocks.size();
+    initFlocks(numFlocks);
+}
+
 //========================================================================================
 /*
 *	Rendering Functions:
 */
 //========================================================================================
 
+
+//This isn't setting a mode, its setting a uniform locations.
 void setDrawingMode(int mode, GLuint program)
 {
 	glUseProgram(program);
@@ -761,20 +836,34 @@ void error_callback(int error, const char* description)
     cout << "Error: " << description << endl;
 }
 
+
 void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos)
 {
 	int b1 = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
 	int b2 = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT);
 	if (b1 == GLFW_PRESS || b2 == GLFW_PRESS)
 	{
-		uint offset  = flock->boids.size()/20;
+
 		uint c = 0;
 		vec3 avgPos = vec3(0);
-	/*	for(uint i=0; i<flock->boids.size(); i+=offset)
-		{
-		//	avgPos += flock->boids[i]->position;
-			c++;
-		}*/
+
+		if(selectedFlock != NULL){
+			uint offset  = selectedFlock->boids.size()/20;
+			for(uint i=0; i<selectedFlock->boids.size(); i+=offset)
+			{
+				avgPos += selectedFlock->boids[i]->position;
+				c++;
+			}
+		}else{  //No selected flock:
+      for(Flock * f : flocks){
+        uint offset  = f->boids.size()/20;
+        for(uint i=0; i< f->boids.size(); i+=offset)
+        {
+          avgPos += f->boids[i]->position;
+          c++;
+        }
+      }
+    }
 
 		mat4 view= cam.getViewMatrix();
 		mat4 proj= cam.getPerspectiveMatrix();
@@ -782,27 +871,37 @@ void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos)
 		int width, height;
 		glfwGetWindowSize(window, &width, &height);
 
-		//avgPos *= (1.f/(float)c);
+		avgPos *= (1.f/(float)c);
 
 		vec2 v = vec2(xpos, height-ypos);
 		float depth = project(avgPos, view, proj, vec4(0.f,0.f,(float)width, (float)height)).z;
 		vec3 projCursor = unProject(vec3(v.x,v.y,depth), view, proj, vec4(0.f,0.f,(float)width, (float)height));
 
-		flock->herdPoint = projCursor;
+
+		flockWrapperSet(herdPoint,projCursor);
 	}
 }
+
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 {
 	if(button == GLFW_MOUSE_BUTTON_LEFT && action==GLFW_PRESS)
-		flock->herding = true;
-	else if(button == GLFW_MOUSE_BUTTON_LEFT && action==GLFW_RELEASE)
-		flock->herding = false;
+	{
+		flockWrapperSet(herding,true);
+	}
+	if(button == GLFW_MOUSE_BUTTON_LEFT && action==GLFW_RELEASE)
+	{
+		flockWrapperSet(herding,false);
+	}
 
 	if(button == GLFW_MOUSE_BUTTON_RIGHT && action==GLFW_PRESS)
-		flock->cHerding = true;
-	else if(button == GLFW_MOUSE_BUTTON_RIGHT && action==GLFW_RELEASE)
-		flock->cHerding = false;
+	{
+		flockWrapperSet(cHerding,true);
+	}
+	if(button == GLFW_MOUSE_BUTTON_RIGHT && action==GLFW_RELEASE)
+	{
+		flockWrapperSet(cHerding,false);
+	}
 }
 
 #define CAM_SPEED 1.f
@@ -835,10 +934,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
     else if(key == GLFW_KEY_R && action == GLFW_PRESS)
     {
-    	flock->boids.clear();
-    	delete(flock);
-    	flock = new Flock("FlockInfo.txt");
-    	glfwSetTime(0);
+            initFlocks();
     }
 
     else if(key == GLFW_KEY_F12 && action == GLFW_PRESS)

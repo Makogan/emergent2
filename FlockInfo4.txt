@@ -1,0 +1,19 @@
+BoidNum: 1000
+
+maxAcceleration: 20
+maxVelocity: 20
+fov: 300
+
+sepRadius: 10
+alignmentRadius: 20
+cohesionRadius: 40
+
+sepCoeff: 17
+alignmentCoeff: 0.5
+cohesionCoeff: 15
+
+radius: 500
+
+center: 0 0 0
+
+color:	0.8 0.1 0.8

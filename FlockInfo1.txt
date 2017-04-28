@@ -8,13 +8,12 @@ sepRadius: 12
 alignmentRadius: 15
 cohesionRadius: 25
 
-sepCoeff: 20
-alignmentCoeff:  1
-cohesionCoeff:  5
+sepCoeff: 1
+alignmentCoeff:  0.01
+cohesionCoeff:  0.5
 
 radius: 500
 
 center: 0 0 0
 
 color:	0 0.4 0.4
-color:  1 0.3 0
